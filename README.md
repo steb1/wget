@@ -33,4 +33,4 @@ To install the program, follow these steps:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your_username/custom-wget.git
+   git clone https://learn.zone01dakar.sn/git/lomalack/wget-test.git
