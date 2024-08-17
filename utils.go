@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"golang.org/x/net/html"
+	"golang.org/x/time/rate"
 )
 
 func extractDomain(rawURL string) (string, error) {
@@ -230,7 +231,7 @@ func parseRateLimit(rateLimit string) (int64, error) {
 		multiplier = 1024
 		rateLimit = strings.TrimSuffix(rateLimit, "k")
 	} else if strings.HasSuffix(rateLimit, "m") {
-		multiplier = 1024 * 1024
+		multiplier = 4 * 1024 * 1024
 		rateLimit = strings.TrimSuffix(rateLimit, "m")
 	}
 
@@ -730,9 +731,11 @@ func limitRate(reader io.Reader, rateLimit string) (io.Reader, error) {
 		return reader, nil
 	}
 
+	limiter := rate.NewLimiter(rate.Limit(limit), int(limit)/10) // burst de 1/10 de seconde
+	
 	return &RateLimitedReader{
 		reader:    reader,
-		rateLimit: limit,
+		rateLimit: int64(limiter.Limit()),
 		lastRead:  time.Now(),
 	}, nil
 }
