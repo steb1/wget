@@ -625,101 +625,108 @@ func shouldExclude(url string, excludePaths []string) bool {
 }
 
 func convertLinks(outputDir string) error {
-	return filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+    return filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
 
-		if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".html") || strings.HasSuffix(strings.ToLower(path), ".css")) {
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			fmt.Println("Converting links in", path)
-			converted := convertURLsInContent(string(content), path, outputDir)
-			fmt.Println("Converted links in", converted)
+        if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".html") || strings.HasSuffix(strings.ToLower(path), ".css")) {
+            content, err := os.ReadFile(path)
+            if err != nil {
+                return err
+            }
+            converted := convertURLsInContent(string(content), path, outputDir)
 
-			err = os.WriteFile(path, []byte(converted), 0644)
-			if err != nil {
-				return err
-			}
-		}
+            err = os.WriteFile(path, []byte(converted), 0644)
+            if err != nil {
+                return err
+            }
+        }
 
-		return nil
-	})
+        return nil
+    })
 }
 
 func convertURLsInContent(content, filePath, outputDir string) string {
-	isHTML := strings.HasSuffix(strings.ToLower(filePath), ".html")
-	isCSS := strings.HasSuffix(strings.ToLower(filePath), ".css")
+    isHTML := strings.HasSuffix(strings.ToLower(filePath), ".html")
+    isCSS := strings.HasSuffix(strings.ToLower(filePath), ".css")
 
-	convertURL := func(originalURL string) string {
-		if strings.HasPrefix(originalURL, "http://") || strings.HasPrefix(originalURL, "https://") {
-			// External URL, don't modify
-			return originalURL
-		}
+    convertURL := func(originalURL string) string {
+        if strings.HasPrefix(originalURL, "http://") || strings.HasPrefix(originalURL, "https://") {
+            // External URL, don't modify
+            return originalURL
+        }
 
-		// Remove leading '/' if present
-		if strings.HasPrefix(originalURL, "/") {
-			originalURL = originalURL[1:]
-		}
+        // Remove leading '/' if present
+        if strings.HasPrefix(originalURL, "/") {
+            originalURL = originalURL[1:]
+        }
 
-		// Construct the path relative to the current file
-		relativePath := filepath.Join(filepath.Dir(filePath), originalURL)
-		newPath, err := filepath.Rel(filepath.Dir(filePath), relativePath)
-		if err != nil {
-			// If we can't make it relative, use the original URL
-			return originalURL
-		}
+        // Construct the path relative to the current file
+        relativePath := filepath.Join(filepath.Dir(filePath), originalURL)
+        newPath, err := filepath.Rel(filepath.Dir(filePath), relativePath)
+        if err != nil {
+            // If we can't make it relative, use the original URL
+            return originalURL
+        }
 
-		// Convert Windows path separators to forward slashes for URLs
-		return strings.ReplaceAll(newPath, "\\", "/")
-	}
+        // Convert Windows path separators to forward slashes for URLs
+        return strings.ReplaceAll(newPath, "\\", "/")
+    }
 
-	if isHTML {
-		doc, err := html.Parse(strings.NewReader(content))
-		if err != nil {
-			return content
-		}
+    if isHTML {
+        doc, err := html.Parse(strings.NewReader(content))
+        if err != nil {
+            return content
+        }
 
-		var traverse func(*html.Node)
-		traverse = func(n *html.Node) {
-			if n.Type == html.ElementNode {
-				for i, a := range n.Attr {
-					if (n.Data == "a" && a.Key == "href") ||
-						((n.Data == "img" || n.Data == "script") && a.Key == "src") ||
-						(n.Data == "link" && a.Key == "href") {
-						n.Attr[i].Val = convertURL(a.Val)
-					}
-				}
-			}
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				traverse(c)
-			}
-		}
-		traverse(doc)
+        var traverse func(*html.Node)
+        traverse = func(n *html.Node) {
+            if n.Type == html.ElementNode {
+                for i, a := range n.Attr {
+                    if (n.Data == "a" && a.Key == "href") ||
+                        ((n.Data == "img" || n.Data == "script") && a.Key == "src") ||
+                        (n.Data == "link" && a.Key == "href") {
+                        n.Attr[i].Val = convertURL(a.Val)
+                    } else if n.Data == "style" {
+                        // Handle inline styles
+                        n.Attr[i].Val = convertCSSURLs(a.Val, convertURL)
+                    }
+                }
+            } else if n.Type == html.TextNode && n.Parent != nil && n.Parent.Data == "style" {
+                // Handle <style> tag contents
+                n.Data = convertCSSURLs(n.Data, convertURL)
+            }
+            for c := n.FirstChild; c != nil; c = c.NextSibling {
+                traverse(c)
+            }
+        }
+        traverse(doc)
 
-		var b strings.Builder
-		err = html.Render(&b, doc)
-		if err != nil {
-			return content
-		}
-		return b.String()
-	} else if isCSS {
-		// Convert URLs in CSS content
-		urlRegex := regexp.MustCompile(`url\(['"]?(.+?)['"]?\)`)
-		converted := urlRegex.ReplaceAllStringFunc(content, func(match string) string {
-			submatches := urlRegex.FindStringSubmatch(match)
-			if len(submatches) < 2 {
-				return match
-			}
-			newURL := convertURL(submatches[1])
-			return strings.Replace(match, submatches[1], newURL, 1)
-		})
-		return converted
-	}
+        var b strings.Builder
+        err = html.Render(&b, doc)
+        if err != nil {
+            return content
+        }
+        return b.String()
+    } else if isCSS {
+        return convertCSSURLs(content, convertURL)
+    }
 
-	return content
+    return content
+}
+
+
+func convertCSSURLs(css string, convertURL func(string) string) string {
+    urlRegex := regexp.MustCompile(`url\(['"]?(.+?)['"]?\)`)
+    return urlRegex.ReplaceAllStringFunc(css, func(match string) string {
+        submatches := urlRegex.FindStringSubmatch(match)
+        if len(submatches) < 2 {
+            return match
+        }
+        newURL := convertURL(submatches[1])
+        return strings.Replace(match, submatches[1], newURL, 1)
+    })
 }
 
 func limitRate(reader io.Reader, rateLimit string) (io.Reader, error) {
