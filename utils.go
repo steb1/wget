@@ -388,7 +388,7 @@ func downloadInBack(config Config) error {
 	}
 
 	contentLength := resp.ContentLength
-	//log.Printf("content size: %d [~%.2fMB]\n", contentLength, float64(contentLength)/(1024*1024))
+	log.Printf("content size: %d [~%.2fMB]\n", contentLength, float64(contentLength)/(1024*1024))
 
 	// Determine output file name and path
 	outputName := config.OutputName
@@ -439,7 +439,7 @@ func downloadInBack(config Config) error {
 			}
 
 			//Update progress bar
-			progressBar.Update(totalRead, contentLength)
+			// progressBar.Update(totalRead, contentLength)
 
 			//Calculate and display download speed
 			if time.Since(lastUpdate) >= time.Second {
@@ -487,13 +487,31 @@ func (pb *ProgressBar) Update(current, total int64) {
 	speed := float64(current) / elapsed.Seconds() / 1024 // KB/s
 	remaining := time.Duration(float64(total-current)/speed/1024) * time.Second
 
-	fmt.Printf("\r[%-50s] %.2f%% | %.2f KB/s | ETA: %v",
+	fmt.Printf("\r%s / %s [%-50s] %.2f%% | %.2f KB/s | ETA: %v",
+		FormatFileSize(current),FormatFileSize(total),
 		strings.Repeat("=", completed)+strings.Repeat(" ", width-completed),
 		percentage,
 		speed,
 		remaining.Round(time.Second))
 }
+func FormatFileSize(size int64) string {
+	const (
+		KiB = 1024
+		MiB = KiB * 1024
+		GiB = MiB * 1024
+	)
 
+	switch {
+	case size >= GiB:
+		return fmt.Sprintf("%.2f GiB", float64(size)/float64(GiB))
+	case size >= MiB:
+		return fmt.Sprintf("%.2f MiB", float64(size)/float64(MiB))
+	case size >= KiB:
+		return fmt.Sprintf("%.2f KiB", float64(size)/float64(KiB))
+	default:
+		return fmt.Sprintf("%d B", size)
+	}
+}
 func (pb *ProgressBar) Finish() {
 	fmt.Println()
 }

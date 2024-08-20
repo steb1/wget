@@ -1,0 +1,9 @@
+2024/08/20 11:57:07 Downloading in background...
+start at 2024-08-20 11:57:07
+sending request, awaiting response...
+status 200 OK
+content size: 20971520 [~20.00MB]
+saving file to: ./20MB.zip
+
+Downloaded [http://ipv4.download.thinkbroadband.com/20MB.zip]
+finished at 2024-08-20 11:57:13
