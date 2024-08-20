@@ -289,7 +289,6 @@ func Download(config Config) error {
 		outputPath = "."
 	}
 	fullPath := filepath.Join(outputPath, outputName)
-	fmt.Printf("saving file to: %s\n", fullPath)
 
 	// Create the directory if it doesn't exist
 	err = os.MkdirAll(filepath.Dir(fullPath), 0755)
@@ -307,7 +306,7 @@ func Download(config Config) error {
 	defer file.Close()
 
 	// Create progress bar
-	progressBar := createProgressBar(contentLength)
+	progressBar := &ProgressBar{startTime: time.Now()}
 
 	// Apply rate limiting if specified
 	reader, err := limitRate(resp.Body, config.RateLimit)
@@ -318,37 +317,33 @@ func Download(config Config) error {
 	// Create a buffer for copying
 	buf := make([]byte, 1024*1024)
 	totalRead := int64(0)
-	lastUpdate := time.Now()
+    lastUpdate := time.Now()
+
 
 	for {
-		n, err := reader.Read(buf)
-		if n > 0 {
-			totalRead += int64(n)
-			_, writeErr := file.Write(buf[:n])
-			if writeErr != nil {
-				return fmt.Errorf("error writing to file: %v", writeErr)
-			}
+        n, err := reader.Read(buf)
+        if n > 0 {
+            totalRead += int64(n)
+            _, writeErr := file.Write(buf[:n])
+            if writeErr != nil {
+                return fmt.Errorf("error writing to file: %v", writeErr)
+            }
 
-			// Update progress bar
-			progressBar.Update(totalRead, contentLength)
+            // Update progress bar
+            if time.Since(lastUpdate) >= time.Second {
+                progressBar.Update(totalRead, contentLength)
+                lastUpdate = time.Now()
+            }
+        }
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            return fmt.Errorf("error reading response body: %v", err)
+        }
+    }
 
-			// Calculate and display download speed
-			if time.Since(lastUpdate) >= time.Second {
-				speed := float64(totalRead) / time.Since(startTime).Seconds() / 1024 // KB/s
-				remainingTime := time.Duration(float64(contentLength-totalRead)/speed/1024) * time.Second
-				fmt.Printf("\rProgress: %.2f%% | Speed: %.2f KB/s | ETA: %v", float64(totalRead)/float64(contentLength)*100, speed, remainingTime)
-				lastUpdate = time.Now()
-			}
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("error reading response body: %v", err)
-		}
-	}
-
-	progressBar.Finish()
+	progressBar.Update(totalRead, contentLength)
 
 	finishTime := time.Now()
 	fmt.Printf("\nDownloaded [%s]\n", config.URL)
@@ -394,7 +389,7 @@ func downloadInBack(config Config) error {
 	}
 
 	contentLength := resp.ContentLength
-	log.Printf("content size: %d [~%.2fMB]\n", contentLength, float64(contentLength)/(1024*1024))
+	//log.Printf("content size: %d [~%.2fMB]\n", contentLength, float64(contentLength)/(1024*1024))
 
 	// Determine output file name and path
 	outputName := config.OutputName
@@ -433,7 +428,7 @@ func downloadInBack(config Config) error {
 	// Create a buffer for copying
 	buf := make([]byte, 1024*1024)
 	totalRead := int64(0)
-	//lastUpdate := time.Now()
+	lastUpdate := time.Now()
 
 	for {
 		n, err := reader.Read(buf)
@@ -444,16 +439,16 @@ func downloadInBack(config Config) error {
 				return fmt.Errorf("error writing to file: %v", writeErr)
 			}
 
-			// Update progress bar
-			//progressBar.Update(totalRead, contentLength)
+			//Update progress bar
+			progressBar.Update(totalRead, contentLength)
 
-			// Calculate and display download speed
-			// if time.Since(lastUpdate) >= time.Second {
-			//     speed := float64(totalRead) / time.Since(startTime).Seconds() / 1024 // KB/s
-			//     //remainingTime := time.Duration(float64(contentLength-totalRead)/speed/1024) * time.Second
-			//     //log.Printf("\rProgress: %.2f%% | Speed: %.2f KB/s | ETA: %v", float64(totalRead)/float64(contentLength)*100, speed, remainingTime)
-			//     lastUpdate = time.Now()
-			// }
+			//Calculate and display download speed
+			if time.Since(lastUpdate) >= time.Second {
+			    speed := float64(totalRead) / time.Since(startTime).Seconds() / 1024 // KB/s
+			    remainingTime := time.Duration(float64(contentLength-totalRead)/speed/1024) * time.Second
+			    log.Printf("\rProgress: %.2f%% | Speed: %.2f KB/s | ETA: %v", float64(totalRead)/float64(contentLength)*100, speed, remainingTime)
+			    lastUpdate = time.Now()
+			}
 		}
 		if err == io.EOF {
 			break
@@ -474,24 +469,30 @@ func downloadInBack(config Config) error {
 }
 
 func createProgressBar(total int64) *ProgressBar {
-	return &ProgressBar{
-		Total: total,
-	}
+    return &ProgressBar{startTime: time.Now()}
 }
 
 type ProgressBar struct {
-	Total int64
+    startTime time.Time
 }
 
 func (pb *ProgressBar) Update(current, total int64) {
-	if total <= 0 {
-		return
-	}
-	percentage := float64(current) / float64(total) * 100
-	width := 50
-	completed := int(percentage / 100 * float64(width))
+    if total <= 0 {
+        return
+    }
+    percentage := float64(current) / float64(total) * 100
+    width := 50
+    completed := int(percentage / 100 * float64(width))
 
-	fmt.Printf("\r[%-50s] %.2f%%", strings.Repeat("=", completed)+strings.Repeat(" ", width-completed), percentage)
+    elapsed := time.Since(pb.startTime)
+    speed := float64(current) / elapsed.Seconds() / 1024 // KB/s
+    remaining := time.Duration(float64(total-current)/speed/1024) * time.Second
+
+    fmt.Printf("\r[%-50s] %.2f%% | %.2f KB/s | ETA: %v", 
+        strings.Repeat("=", completed)+strings.Repeat(" ", width-completed), 
+        percentage, 
+        speed,
+        remaining.Round(time.Second))
 }
 
 func (pb *ProgressBar) Finish() {
