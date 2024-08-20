@@ -317,31 +317,30 @@ func Download(config Config) error {
 	// Create a buffer for copying
 	buf := make([]byte, 1024*1024)
 	totalRead := int64(0)
-    lastUpdate := time.Now()
-
+	lastUpdate := time.Now()
 
 	for {
-        n, err := reader.Read(buf)
-        if n > 0 {
-            totalRead += int64(n)
-            _, writeErr := file.Write(buf[:n])
-            if writeErr != nil {
-                return fmt.Errorf("error writing to file: %v", writeErr)
-            }
+		n, err := reader.Read(buf)
+		if n > 0 {
+			totalRead += int64(n)
+			_, writeErr := file.Write(buf[:n])
+			if writeErr != nil {
+				return fmt.Errorf("error writing to file: %v", writeErr)
+			}
 
-            // Update progress bar
-            if time.Since(lastUpdate) >= time.Second {
-                progressBar.Update(totalRead, contentLength)
-                lastUpdate = time.Now()
-            }
-        }
-        if err == io.EOF {
-            break
-        }
-        if err != nil {
-            return fmt.Errorf("error reading response body: %v", err)
-        }
-    }
+			// Update progress bar
+			if time.Since(lastUpdate) >= time.Second {
+				progressBar.Update(totalRead, contentLength)
+				lastUpdate = time.Now()
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error reading response body: %v", err)
+		}
+	}
 
 	progressBar.Update(totalRead, contentLength)
 
@@ -444,10 +443,10 @@ func downloadInBack(config Config) error {
 
 			//Calculate and display download speed
 			if time.Since(lastUpdate) >= time.Second {
-			    speed := float64(totalRead) / time.Since(startTime).Seconds() / 1024 // KB/s
-			    remainingTime := time.Duration(float64(contentLength-totalRead)/speed/1024) * time.Second
-			    log.Printf("\rProgress: %.2f%% | Speed: %.2f KB/s | ETA: %v", float64(totalRead)/float64(contentLength)*100, speed, remainingTime)
-			    lastUpdate = time.Now()
+				//speed := float64(totalRead) / time.Since(startTime).Seconds() / 1024 // KB/s
+				//remainingTime := time.Duration(float64(contentLength-totalRead)/speed/1024) * time.Second
+				//log.Printf("\rProgress: %.2f%% | Speed: %.2f KB/s | ETA: %v", float64(totalRead)/float64(contentLength)*100, speed, remainingTime)
+				lastUpdate = time.Now()
 			}
 		}
 		if err == io.EOF {
@@ -469,30 +468,30 @@ func downloadInBack(config Config) error {
 }
 
 func createProgressBar(total int64) *ProgressBar {
-    return &ProgressBar{startTime: time.Now()}
+	return &ProgressBar{startTime: time.Now()}
 }
 
 type ProgressBar struct {
-    startTime time.Time
+	startTime time.Time
 }
 
 func (pb *ProgressBar) Update(current, total int64) {
-    if total <= 0 {
-        return
-    }
-    percentage := float64(current) / float64(total) * 100
-    width := 50
-    completed := int(percentage / 100 * float64(width))
+	if total <= 0 {
+		return
+	}
+	percentage := float64(current) / float64(total) * 100
+	width := 50
+	completed := int(percentage / 100 * float64(width))
 
-    elapsed := time.Since(pb.startTime)
-    speed := float64(current) / elapsed.Seconds() / 1024 // KB/s
-    remaining := time.Duration(float64(total-current)/speed/1024) * time.Second
+	elapsed := time.Since(pb.startTime)
+	speed := float64(current) / elapsed.Seconds() / 1024 // KB/s
+	remaining := time.Duration(float64(total-current)/speed/1024) * time.Second
 
-    fmt.Printf("\r[%-50s] %.2f%% | %.2f KB/s | ETA: %v", 
-        strings.Repeat("=", completed)+strings.Repeat(" ", width-completed), 
-        percentage, 
-        speed,
-        remaining.Round(time.Second))
+	fmt.Printf("\r[%-50s] %.2f%% | %.2f KB/s | ETA: %v",
+		strings.Repeat("=", completed)+strings.Repeat(" ", width-completed),
+		percentage,
+		speed,
+		remaining.Round(time.Second))
 }
 
 func (pb *ProgressBar) Finish() {
@@ -626,108 +625,107 @@ func shouldExclude(url string, excludePaths []string) bool {
 }
 
 func convertLinks(outputDir string) error {
-    return filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
-        if err != nil {
-            return err
-        }
+	return filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-        if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".html") || strings.HasSuffix(strings.ToLower(path), ".css")) {
-            content, err := os.ReadFile(path)
-            if err != nil {
-                return err
-            }
-            converted := convertURLsInContent(string(content), path, outputDir)
+		if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".html") || strings.HasSuffix(strings.ToLower(path), ".css")) {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			converted := convertURLsInContent(string(content), path, outputDir)
 
-            err = os.WriteFile(path, []byte(converted), 0644)
-            if err != nil {
-                return err
-            }
-        }
+			err = os.WriteFile(path, []byte(converted), 0644)
+			if err != nil {
+				return err
+			}
+		}
 
-        return nil
-    })
+		return nil
+	})
 }
 
 func convertURLsInContent(content, filePath, outputDir string) string {
-    isHTML := strings.HasSuffix(strings.ToLower(filePath), ".html")
-    isCSS := strings.HasSuffix(strings.ToLower(filePath), ".css")
+	isHTML := strings.HasSuffix(strings.ToLower(filePath), ".html")
+	isCSS := strings.HasSuffix(strings.ToLower(filePath), ".css")
 
-    convertURL := func(originalURL string) string {
-        if strings.HasPrefix(originalURL, "http://") || strings.HasPrefix(originalURL, "https://") {
-            // External URL, don't modify
-            return originalURL
-        }
+	convertURL := func(originalURL string) string {
+		if strings.HasPrefix(originalURL, "http://") || strings.HasPrefix(originalURL, "https://") {
+			// External URL, don't modify
+			return originalURL
+		}
 
-        // Remove leading '/' if present
-        if strings.HasPrefix(originalURL, "/") {
-            originalURL = originalURL[1:]
-        }
+		// Remove leading '/' if present
+		if strings.HasPrefix(originalURL, "/") {
+			originalURL = originalURL[1:]
+		}
 
-        // Construct the path relative to the current file
-        relativePath := filepath.Join(filepath.Dir(filePath), originalURL)
-        newPath, err := filepath.Rel(filepath.Dir(filePath), relativePath)
-        if err != nil {
-            // If we can't make it relative, use the original URL
-            return originalURL
-        }
+		// Construct the path relative to the current file
+		relativePath := filepath.Join(filepath.Dir(filePath), originalURL)
+		newPath, err := filepath.Rel(filepath.Dir(filePath), relativePath)
+		if err != nil {
+			// If we can't make it relative, use the original URL
+			return originalURL
+		}
 
-        // Convert Windows path separators to forward slashes for URLs
-        return strings.ReplaceAll(newPath, "\\", "/")
-    }
+		// Convert Windows path separators to forward slashes for URLs
+		return strings.ReplaceAll(newPath, "\\", "/")
+	}
 
-    if isHTML {
-        doc, err := html.Parse(strings.NewReader(content))
-        if err != nil {
-            return content
-        }
+	if isHTML {
+		doc, err := html.Parse(strings.NewReader(content))
+		if err != nil {
+			return content
+		}
 
-        var traverse func(*html.Node)
-        traverse = func(n *html.Node) {
-            if n.Type == html.ElementNode {
-                for i, a := range n.Attr {
-                    if (n.Data == "a" && a.Key == "href") ||
-                        ((n.Data == "img" || n.Data == "script") && a.Key == "src") ||
-                        (n.Data == "link" && a.Key == "href") {
-                        n.Attr[i].Val = convertURL(a.Val)
-                    } else if n.Data == "style" {
-                        // Handle inline styles
-                        n.Attr[i].Val = convertCSSURLs(a.Val, convertURL)
-                    }
-                }
-            } else if n.Type == html.TextNode && n.Parent != nil && n.Parent.Data == "style" {
-                // Handle <style> tag contents
-                n.Data = convertCSSURLs(n.Data, convertURL)
-            }
-            for c := n.FirstChild; c != nil; c = c.NextSibling {
-                traverse(c)
-            }
-        }
-        traverse(doc)
+		var traverse func(*html.Node)
+		traverse = func(n *html.Node) {
+			if n.Type == html.ElementNode {
+				for i, a := range n.Attr {
+					if (n.Data == "a" && a.Key == "href") ||
+						((n.Data == "img" || n.Data == "script") && a.Key == "src") ||
+						(n.Data == "link" && a.Key == "href") {
+						n.Attr[i].Val = convertURL(a.Val)
+					} else if n.Data == "style" {
+						// Handle inline styles
+						n.Attr[i].Val = convertCSSURLs(a.Val, convertURL)
+					}
+				}
+			} else if n.Type == html.TextNode && n.Parent != nil && n.Parent.Data == "style" {
+				// Handle <style> tag contents
+				n.Data = convertCSSURLs(n.Data, convertURL)
+			}
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				traverse(c)
+			}
+		}
+		traverse(doc)
 
-        var b strings.Builder
-        err = html.Render(&b, doc)
-        if err != nil {
-            return content
-        }
-        return b.String()
-    } else if isCSS {
-        return convertCSSURLs(content, convertURL)
-    }
+		var b strings.Builder
+		err = html.Render(&b, doc)
+		if err != nil {
+			return content
+		}
+		return b.String()
+	} else if isCSS {
+		return convertCSSURLs(content, convertURL)
+	}
 
-    return content
+	return content
 }
 
-
 func convertCSSURLs(css string, convertURL func(string) string) string {
-    urlRegex := regexp.MustCompile(`url\(['"]?(.+?)['"]?\)`)
-    return urlRegex.ReplaceAllStringFunc(css, func(match string) string {
-        submatches := urlRegex.FindStringSubmatch(match)
-        if len(submatches) < 2 {
-            return match
-        }
-        newURL := convertURL(submatches[1])
-        return strings.Replace(match, submatches[1], newURL, 1)
-    })
+	urlRegex := regexp.MustCompile(`url\(['"]?(.+?)['"]?\)`)
+	return urlRegex.ReplaceAllStringFunc(css, func(match string) string {
+		submatches := urlRegex.FindStringSubmatch(match)
+		if len(submatches) < 2 {
+			return match
+		}
+		newURL := convertURL(submatches[1])
+		return strings.Replace(match, submatches[1], newURL, 1)
+	})
 }
 
 func limitRate(reader io.Reader, rateLimit string) (io.Reader, error) {
@@ -740,7 +738,7 @@ func limitRate(reader io.Reader, rateLimit string) (io.Reader, error) {
 	}
 
 	limiter := rate.NewLimiter(rate.Limit(limit), int(limit)/10) // burst de 1/10 de seconde
-	
+
 	return &RateLimitedReader{
 		reader:    reader,
 		rateLimit: int64(limiter.Limit()),
@@ -753,21 +751,37 @@ type RateLimitedReader struct {
 	rateLimit int64
 	lastRead  time.Time
 	bytesRead int64
+	startTime time.Time
 }
 
 func (r *RateLimitedReader) Read(p []byte) (int, error) {
-	now := time.Now()
-	elapsed := now.Sub(r.lastRead)
-	allowedBytes := int64(elapsed.Seconds() * float64(r.rateLimit))
+    if r.startTime.IsZero() {
+        r.startTime = time.Now() // Initialize the start time on the first read
+    }
 
-	if r.bytesRead >= allowedBytes {
-		time.Sleep(time.Second)
-		return r.Read(p)
-	}
+    // Calculate the maximum number of bytes that can be read without exceeding the rate limit
+    elapsedTime := time.Since(r.startTime).Seconds()
+    allowedBytes := int64(elapsedTime * float64(r.rateLimit))
 
-	n, err := r.reader.Read(p)
-	r.bytesRead += int64(n)
-	r.lastRead = now
+    // If we've already read more than the allowed bytes, wait until we're allowed to read more
+    if r.bytesRead >= allowedBytes {
+        sleepDuration := time.Duration(float64(r.bytesRead-allowedBytes)/float64(r.rateLimit)) * time.Second
+        time.Sleep(sleepDuration)
 
-	return n, err
+        // Recalculate allowed bytes after sleeping
+        elapsedTime = time.Since(r.startTime).Seconds()
+        allowedBytes = int64(elapsedTime * float64(r.rateLimit))
+    }
+
+    // Calculate the maximum number of bytes to read this time to stay within the limit
+    remainingBytes := allowedBytes - r.bytesRead
+    if remainingBytes + 100 < int64(len(p)) {
+        p = p[:remainingBytes] // Adjust the buffer size to not exceed the allowed bytes
+    }
+
+    // Read the data
+    n, err := r.reader.Read(p)
+    r.bytesRead += int64(n)
+
+    return n, err
 }
